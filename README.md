@@ -11,9 +11,9 @@ downloads = {
     '/opt/bin/myProgram': {
         'url': 'https://myServer.net/myProgram',
         'sha256': '78abad9b589f303f6d9c129ed5ebfe240fbdbdaa5bb0ffec43dacb2991bd526a',
-		'owner': 'root',
-		'group': 'root',
-		'mode': '0644',
+        'owner': 'root',
+        'group': 'root',
+        'mode': '0644',
     }
 }
 ```
