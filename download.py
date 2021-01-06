@@ -21,6 +21,9 @@ class Download(Item):
         'url': "",
         'sha256': "",
         'verifySSL': True,
+        'owner': "root",
+        'group': "root",
+        'mode': "0644",
     }
     ITEM_TYPE_NAME = "download"
     REQUIRED_ATTRIBUTES = []
@@ -66,11 +69,27 @@ class Download(Item):
 
                 return False
 
+            # Set owner
+            self.node.run('chown {owner}:{group} {file}'.format(
+                owner=self.attributes['owner'],
+                group=self.attributes['group'],
+                file=quote(self.name),
+            ))
+
+            # Set mode
+            self.node.run('chmod {mode} {file}'.format(
+                mode=self.attributes['mode'],
+                file=quote(self.name),
+            ))
+
     def cdict(self):
         """This is how the world should be"""
         cdict = {
             'type': 'download',
             'sha256': self.attributes['sha256'],
+            'owner': self.attributes['owner'],
+            'group': self.attributes['group'],
+            'mode': self.attributes['mode'],
         }
 
         return cdict
@@ -83,7 +102,10 @@ class Download(Item):
         else:
             sdict = {
                 'type': 'download',
-                'sha256': self.__hash_remote_file(self.name)
+                'sha256': self.__hash_remote_file(self.name),
+                'owner': path_info.owner,
+                'group': path_info.group,
+                'mode': path_info.mode,
             }
 
         return sdict
