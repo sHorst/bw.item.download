@@ -20,32 +20,52 @@ class Download(Item):
     ITEM_ATTRIBUTES = {
         'url': "",
         'sha256': "",
+        'sha512': "",
         'verifySSL': True,
         'owner': "root",
         'group': "root",
         'mode': "0644",
     }
     ITEM_TYPE_NAME = "download"
-    REQUIRED_ATTRIBUTES = []
+    REQUIRED_ATTRIBUTES = ['url']
 
     def __repr__(self):
         return "<Download name:{}>".format(self.name)
 
-    def __hash_remote_file(self, filename):
+    def get_hash_type(self):
+        if self.attributes.get('sha512', None):
+            return 'sha512'
+        if self.attributes.get('sha256', None):
+            return 'sha256'
+
+        raise BundleError(_(
+            "at least one hash must be set on {item} in bundle '{bundle}'"
+        ).format(
+            bundle=bundle.name,
+            item=item_id,
+        ))
+
+    def __hash_remote_file(self, filename, hash_type):
         path_info = PathInfo(self.node, filename)
         if not path_info.is_file:
             return None
 
-        if hasattr(path_info, 'sha256'):
-            return path_info.sha256
+        if hasattr(path_info, hash_type):
+            if hash_type == 'sha256':
+                return path_info.sha256
+            elif hash_type == 'sha512':
+                return path_info.sha512
+            else:
+                raise ValueError(_('unknown hash type {}'.format(hash_type)))
+
         else:
             """"pending pr so do it manualy"""
             if self.node.os == 'macos':
-                result = self.node.run("shasum -a 256 -- {}".format(quote(filename)))
+                result = self.node.run("shasum -a {} -- {}".format(hash_type[3:], quote(filename)))
             elif self.node.os in self.node.OS_FAMILY_BSD:
-                result = self.node.run("sha256 -q -- {}".format(quote(filename)))
+                result = self.node.run("{} -q -- {}".format(hash_type, quote(filename)))
             else:
-                result = self.node.run("sha256sum -- {}".format(quote(filename)))
+                result = self.node.run("{}sum -- {}".format(hash_type, quote(filename)))
             return force_text(result.stdout).strip().split()[0]
 
     def fix(self, status):
@@ -61,9 +81,9 @@ class Download(Item):
             ))
 
             # check hash
-            sha256 = self.__hash_remote_file(self.name)
+            hash = self.__hash_remote_file(self.name, self.get_hash_type())
 
-            if sha256 != self.attributes['sha256']:
+            if hash != self.attributes.get(self.get_hash_type()):
                 # unlink file
                 self.node.run("rm -rf -- {}".format(quote(self.name)))
 
@@ -86,7 +106,7 @@ class Download(Item):
         """This is how the world should be"""
         cdict = {
             'type': 'download',
-            'sha256': self.attributes['sha256'],
+            'hash': self.attributes[self.get_hash_type()],
             'owner': self.attributes['owner'],
             'group': self.attributes['group'],
             'mode': self.attributes['mode'],
@@ -102,7 +122,7 @@ class Download(Item):
         else:
             sdict = {
                 'type': 'download',
-                'sha256': self.__hash_remote_file(self.name),
+                'hash': self.__hash_remote_file(self.name, self.get_hash_type()),
                 'owner': path_info.owner,
                 'group': path_info.group,
                 'mode': path_info.mode,
@@ -112,17 +132,9 @@ class Download(Item):
 
     @classmethod
     def validate_attributes(cls, bundle, item_id, attributes):
-        if 'sha256' not in attributes:
+        if attributes.get('sha256', None) is None and attributes.get('sha512', None) is None:
             raise BundleError(_(
                 "at least one hash must be set on {item} in bundle '{bundle}'"
-            ).format(
-                bundle=bundle.name,
-                item=item_id,
-            ))
-
-        if 'url' not in attributes:
-            raise BundleError(_(
-                "you need to specify the url on {item} in bundle '{bundle}'"
             ).format(
                 bundle=bundle.name,
                 item=item_id,
