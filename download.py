@@ -3,7 +3,7 @@ from bundlewrap.exceptions import BundleError
 from bundlewrap.utils.text import force_text, mark_for_translation as _
 from bundlewrap.utils.remote import PathInfo
 import types
-from pipes import quote
+from shlex import quote
 
 
 class Download(Item):
